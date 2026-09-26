@@ -1,0 +1,33 @@
+[package]
+name = "otel-aws-utils"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+
+[dependencies]
+opentelemetry = { version = "0.32", default-features = false, features = [
+  "trace",
+] }
+opentelemetry-otlp = { version = "0.32", default-features = false, features = [
+  "trace",
+  "http-proto",
+  "hyper-client",
+] }
+opentelemetry_sdk = { version = "0.32", default-features = false, features = [
+  "trace",
+  "rt-tokio",
+] }
+tracing = { version = "0.1", default-features = false }
+tracing-opentelemetry = { version = "0.33", default-features = false }
+tracing-subscriber = { version = "0.3", default-features = false, features = [
+  "std",
+  "fmt",
+  "json",
+  "ansi",
+  "registry",
+  "env-filter",
+] }
+
+[lints.rust]
+unsafe_code = "forbid"

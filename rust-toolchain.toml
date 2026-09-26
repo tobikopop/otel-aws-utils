@@ -1,0 +1,10 @@
+# The ONE place the Rust release for developing this crate is declared.
+#
+# `rustup` honours this file too, so a plain `cargo build` outside the nix
+# shell uses the same release. Keep it in step with the MSRV floor in
+# Cargo.toml (`rust-version`), which stays lower on purpose: it is the oldest
+# compiler the CONSUMERS build the crate with, not the one we develop with.
+[toolchain]
+channel = "1.98.1"
+profile = "minimal"
+components = ["clippy", "rustfmt"]
