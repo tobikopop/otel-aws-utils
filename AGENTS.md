@@ -24,7 +24,8 @@ must not break.
   and the `xray` module. The PII rule is documented here.
 - `src/telemetry.rs` — subscriber composition (each `LogFormat` variant
   reproduces one calling service's logging contract), the OTLP/HTTP
-  exporter (gated on `OTEL_EXPORTER_OTLP_ENDPOINT`; empty = off),
+  exporter (gated on `OTEL_EXPORTER_OTLP_ENDPOINT`; empty = off; blocking
+  HTTP client, see the rules),
   `instrument_request` (root span, X-Ray parent, force-flush before return,
   error status on `Err`), and `build_resource` (`OTEL_SERVICE_NAME`,
   `OTEL_RESOURCE_ATTRIBUTES`).
@@ -44,6 +45,33 @@ must not break.
   purpose**: `OpenTelemetryLayer<S, _>` names the stack's exact subscriber
   type, so a closure/helper would freeze one `S` for all three. Do not
   "deduplicate" it.
+- **The OTLP exporter MUST use the blocking HTTP client**
+  (`opentelemetry-otlp` feature `reqwest-blocking-client`; the async
+  `hyper-client`/`reqwest-client` features must stay off AND take priority
+  over it when enabled). `SdkTracerProvider::builder().with_batch_exporter()`
+  is opentelemetry_sdk's thread-based processor: it runs exports on its own
+  OS thread with `futures_executor::block_on`, where a Tokio client panics
+  the first time a batch is flushed — `there is no reactor running, must be
+  called from the context of a Tokio 1.x runtime` (opentelemetry-http's
+  `tokio::time::timeout`, src/lib.rs:202 in 0.32). The SDK logs a panic on
+  the BatchProcessor thread, kills it, and then silently drops every span for
+  the life of the sandbox — telemetry is gone, requests look fine. The
+  alternative (the experimental async-runtime processor) is wrong for a
+  shared crate because its `force_flush` waits for a reply from a processor
+  task of the SAME runtime: measured, it never returns — watchdog at 15s —
+  when the caller runs in a spawned task, with 1 worker and with 4, while it
+  does return when the handler is polled by the runtime's own `block_on`
+  future (`lambda_runtime::run` today; `run_concurrent` / Lambda Managed
+  Instances spawn per invocation). Telemetry must not depend on which thread
+  a service's handler happens to run on.
+- **The exporter resolves the endpoint itself**: `OTEL_EXPORTER_OTLP_ENDPOINT`
+  is only the on/off switch in `build_provider` — never feed its value to
+  `with_endpoint()`. Programmatic endpoints are used verbatim, so
+  `http://127.0.0.1:4318` becomes `POST /`; the sidecar's otlphttp receiver
+  routes `/v1/traces` and answers 404, failing every export. Left to itself
+  the exporter appends the signal path (opentelemetry-otlp's
+  `resolve_http_endpoint`), and `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` keeps
+  working as the per-signal override.
 - **Version pairing is pinned**: `opentelemetry_sdk` 0.32 +
   `tracing-opentelemetry` 0.33 + `opentelemetry-otlp` 0.32. Bump them
   together and re-run the tests. `opentelemetry-aws` is deliberately NOT a

@@ -5,13 +5,17 @@
 //! sets it to http://127.0.0.1:4318, the sidecar's OTLP/HTTP receiver).
 //! Unset — unit tests, ministack e2e — the subscriber is exactly the service's
 //! pre-OpenTelemetry logging behaviour and no exporter machinery starts.
+//!
+//! Export runs on the SDK's own background thread with a blocking HTTP client,
+//! so it needs neither a Tokio reactor nor the caller's runtime (see
+//! `build_provider`).
 
 use std::future::Future;
 use std::str::FromStr;
 
 use opentelemetry::KeyValue;
 use opentelemetry::trace::TracerProvider as _;
-use opentelemetry_otlp::{SpanExporter, WithExportConfig};
+use opentelemetry_otlp::SpanExporter;
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::trace::{Sampler, SdkTracerProvider};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -229,13 +233,20 @@ impl Drop for Telemetry {
 /// Builds the tracer provider, or None when OTEL_EXPORTER_OTLP_ENDPOINT is
 /// unset or the exporter cannot be built (logged to stderr, never fatal).
 fn build_provider(service_name: &str) -> Option<SdkTracerProvider> {
-    // Empty counts as unset (Terraform passes "" where telemetry is off).
-    let endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
+    // Empty counts as unset (Terraform passes "" where telemetry is off). The
+    // variable is only the switch — the exporter resolves the URL from it
+    // itself, which is what appends the /v1/traces signal path the sidecar's
+    // otlphttp receiver routes on. with_endpoint() would take the value
+    // verbatim and post to "/", i.e. 404 on every export.
+    std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
         .ok()
         .filter(|v| !v.is_empty())?;
+    // with_http() picks the client from the crate features: reqwest-blocking-client
+    // ("otel-aws-utils/Cargo.toml" keeps the async ones off on purpose). The default
+    // BatchSpanProcessor below exports on its own OS thread, where a Tokio-based
+    // client would panic for want of a reactor.
     let exporter = SpanExporter::builder()
         .with_http()
-        .with_endpoint(endpoint)
         .build()
         .map_err(|error| eprintln!("otel: exporter init failed: {error}"))
         .ok()?;

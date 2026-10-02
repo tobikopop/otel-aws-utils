@@ -12,7 +12,15 @@ opentelemetry = { version = "0.32", default-features = false, features = [
 opentelemetry-otlp = { version = "0.32", default-features = false, features = [
   "trace",
   "http-proto",
-  "hyper-client",
+  # The BLOCKING client, deliberately: SdkTracerProvider::builder()
+  # .with_batch_exporter() (src/telemetry.rs) drives exports on the SDK's own
+  # OS thread, which has no Tokio reactor — an async client panics there the
+  # first time a batch is flushed ("there is no reactor running", raised by
+  # opentelemetry-http's tokio::time::timeout). opentelemetry_sdk 0.32's
+  # BatchSpanProcessor docs say the same: async HTTP clients are not supported
+  # by the thread-based processor. hyper-client / reqwest-client must stay off
+  # (they take priority over reqwest-blocking-client when both are enabled).
+  "reqwest-blocking-client",
 ] }
 opentelemetry_sdk = { version = "0.32", default-features = false, features = [
   "trace",

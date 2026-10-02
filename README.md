@@ -26,6 +26,11 @@ telemetry
   OTLP/HTTP exporter when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. When the
   variable is unset or empty, the subscriber is exactly the pre-OpenTelemetry
   behaviour and no exporter machinery starts.
+* The variable holds the collector's base URL (`http://127.0.0.1:4318`); the
+  exporter appends the `/v1/traces` signal path. Export runs on the SDK's
+  background thread with a blocking HTTP client, so no Tokio runtime is
+  involved — see the rules in `AGENTS.md` before touching the exporter
+  features or the endpoint.
 * `Telemetry::instrument_request` — one root span per invocation, parented
   to `_X_AMZN_TRACE_ID` (X-Ray), flushed before the response returns, error
   status recorded on `Err`.
