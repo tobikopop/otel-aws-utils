@@ -2,8 +2,8 @@
 
 `otel-aws-utils` — OpenTelemetry telemetry for AWS Lambda functions written
 in Rust. One crate, consumed by sibling Lambda services as a git
-dependency over ssh (`otel-aws-utils = { git = "ssh://git@github.com/tobikopop/otel-aws-utils.git" }`,
-private repo).
+dependency over HTTPS (`otel-aws-utils = { git = "https://github.com/tobikopop/otel-aws-utils.git" }`,
+a public repository).
 Human-facing description lives in `README.md`; this file carries what an
 agent needs to work in the repo: commands, code map, and the rules that
 must not break.
@@ -98,10 +98,11 @@ must not break.
 
 ## Consumption
 
-- Git dependency over ssh; consumers pin the commit through their `Cargo.lock`
-  (that SHA is the integrity pin).
+- Git dependency over HTTPS (`https://github.com/tobikopop/otel-aws-utils.git`);
+  consumers pin the commit through their `Cargo.lock` (that SHA is the integrity
+  pin).
 - Consumers' nix builds fetch it client-side via
-  `cargoLock.allowBuiltinFetchGit = true` (honours the local ssh agent) — no
+  `cargoLock.allowBuiltinFetchGit = true` (plain HTTPS, no credentials) — no
   hashes, no source-copying hacks.
 - The collector sidecar the exporter talks to is a separate flake that
   builds the ADOT Collector Lambda extension; the crate only speaks OTLP to

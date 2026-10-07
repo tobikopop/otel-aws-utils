@@ -9,7 +9,7 @@ extension).
 ## Usage
 
 ```toml
-otel-aws-utils = { git = "ssh://git@github.com/tobikopop/otel-aws-utils.git" }
+otel-aws-utils = { git = "https://github.com/tobikopop/otel-aws-utils.git" }
 ```
 
 ```rust
